@@ -1,13 +1,18 @@
 
-# About the project
+# Assignment 1
 
-*Write a short description about the course and add a link to your GitHub repository here. This is an R Markdown (.Rmd) file so you should use R Markdown syntax.*
+**Eeva Vakkari**
+<https://github.com/EevaVakkari/IODS-project>
 
 ```{r}
-# This is a so-called "R chunk" where you can write R code.
-
 date()
-
 ```
-The text continues here.
+## Some feelings after the first week
+It has been quite a heavy crash course into the world of R. the book is good, especially with the exercises and notes in the markdown file, but it's massive for a beginner, like me.
 
+With the R syntax and RStudio environment, I feel as if I was illiterate, almost, but I trust I'll get used to R with more exercises and time.
+
+Also, I feel frustrated about my University of Helsinki laptop: I got everything running with my personal laptop, whereas UH laptop just miserably blundered in each and every step.
+
+## My aims for the course
+After this course, I wish I could work in RStudio at somewhat semi-independent level, at least when dealing with basic things. I aim to familiarize myself with R to the level where I'll be able to understand the error messages I get and the solutions I google.
