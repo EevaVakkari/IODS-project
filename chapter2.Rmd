@@ -8,7 +8,7 @@
 This week, I studied linear regression using a survey data set combined with exam results from a university statistics course. I made a simple linear model and validated it graphically.
 First two code blocks contain the data wrangling part and, after them, the analysis part starts.
 
-### Data wrangling
+## Data wrangling
 ```{r}
 date()
 ```
@@ -41,7 +41,7 @@ head(a)
 ```
 Looking good. Continuing into analysis part of the assignment.
 
-### Data analysis
+## Data analysis
 
 Setting the working directory and reading the csv into a data frame:
 ```{r}
@@ -76,7 +76,8 @@ Making diagnostic plots with the second model.
 ```{r}
 plot(my_model2, which = c(1, 2, 5))
 ```
-### Model evaluation
+
+## Model evaluation 
 
 Linear regression model is based on four assumptions: 
 1. There is a linear relationship between predictor(s) and outcome
