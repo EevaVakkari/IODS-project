@@ -1,0 +1,94 @@
+# Assignment 3
+
+**Eeva Vakkari**
+
+<https://github.com/EevaVakkari/IODS-project>
+
+## Introduction and overview
+This week we practice logistic regression with a survey study combining alcohol consumption and student's grades, as well as demographic, social and school related features. The data was uploaded from from UCI machine learning repository <http://www.archive.ics.uci.edu/dataset/320/student+performance>
+
+```{r}
+date()
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(readr)
+```
+Reading joined and modified data in and checking out the column names:
+```{r}
+setwd("~/Polyembryony_R/IODS/IODS-project/data")
+alc <- read_csv("~/Polyembryony_R/IODS/IODS-project/data/alc.csv")
+head(alc)
+```
+## Analysis of student's high alcohol consumption
+I study sex, age, absences and home address (urban/rural) as explanatory factors for a student's alcohol consumption.
+I hypothesize that the younger female students having more absences and living in the rural locations consume the highest amount of alcohol. I assume all the variables have equal, additive effect on the response variable.
+Let's explore the data:
+```{r}
+g1 <- ggplot(data = alc, aes(x = alc_use))
+g1 + geom_bar()
+```
+It seems that the majority uses relatively low amount of alcohol.
+```{r}
+g2 <- ggplot(alc, aes(x = sex, y = alc_use, fill=sex))+
+  geom_boxplot()
+g2
+```
+Surprisingly, this might indicate that my hypothesis about females consuming more alcohol might not be correct. I'll study this strange thing more in detail.
+```{r}
+g3 <- ggplot(alc, aes(x = age, y = alc_use))+
+  geom_boxplot()
+g3
+```
+Not so informative plot type.
+```{r}
+g4 <- ggplot(alc, aes(x = address, y = alc_use, fill=address))+
+  geom_boxplot()
+g4
+```
+My hypothesis about rural living causing high alcohol consumption might well be correct!
+```{r}
+g5 <- ggplot(alc, aes(x = alc_use, y = absences, color=absences))+
+  geom_point()
+g5
+```
+The alcohol consumption seems to be quite scattered around when plotted together with absences. No clear indication of my hypothesis being correct.
+
+Logistic regression:
+```{r}
+m <- glm(high_use ~ age + sex + address + absences, data = alc, family = "binomial")
+summary(m)
+coefficients(m)
+```
+So, it seems that age and address are statistically insignificant, whereas male sex and high number of absences have statistically highly significant effect on alcohol consumption. Checking the odds ratios and confidence intervals:
+```{r}
+OR <- coef(m) %>% exp
+CI <- confint(m)
+cbind(OR, CI)
+```
+Odds ratio being > 1, i.e. age, male sex, and absences, are positively correlated to alcohol consumption. Odds ratio for urban address is < 1, indicating that it would be negatively correlated. Confidence intervals reveal that age and address are statistically insignificant, whereas male sex and absences are significant. Making a new model with only statistically significant sex and absences included:
+```{r}
+m2 <- glm(high_use ~ absences + sex, data = alc, family = "binomial")
+probabilities <- predict(m2, type = "response")
+alc <- mutate(alc, probability = probabilities)
+alc <- mutate(alc, prediction = probabilities)
+select(alc, absences, sex, high_use, probability, prediction) %>% tail(10)
+table(high_use = alc$high_use, prediction = probabilities)
+g6 <- ggplot(alc, aes(x = high_use, y = probabilities))+
+  geom_boxplot()
+g6
+summary(m2)
+```
+I'm not quite sure wheter I got the cross tabulation right. The second model looks good statistics-wise.
+Trying to compute the average number of wrong predictions:
+```{r}
+loss_func <- function(class, prob) {
+  n_wrong <- abs(class - prob) > 0.5
+  mean(n_wrong)
+}
+loss_func(class = alc$high_use, prob = 0)
+
+```
+So, it seems that the error is smaller with the model than by guessing. With guessing, it would be 0.5.
