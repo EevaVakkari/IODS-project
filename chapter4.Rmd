@@ -270,4 +270,4 @@ Also here, it is clear that the class "high" is standing far out from the other 
 plot_ly(x = matrix_product$LD1, y = matrix_product$LD2, z = matrix_product$LD3, type= 'scatter3d', mode='markers', color = km$cluster) 
 ```
   
-It seems that the clusters for crime rate and the clusters based on kmeans represent just the same socioeconomic clusters in the real life!
+It seems that the clusters for crime rate and the clusters based on kmeans represent just the same socioeconomic clusters!
