@@ -1,0 +1,273 @@
+# Assignment 4
+
+**Eeva Vakkari**
+
+<https://github.com/EevaVakkari/IODS-project>
+
+## Introduction
+This week, we use the Boston data set which contains various housing values of the suburbs. The variables include socioeconomic, demographic and geographic information. In this exercise, I study potentially explanatory variables for crime rate with clustering and linear discriminant analysis (LDA).
+
+```{r}
+date()
+```
+Loading required packages:
+```{r}
+library(MASS)
+library(corrplot)
+library(tidyverse)
+library(dplyr)
+library(readr)
+```
+## Numerical and graphical overview of the data
+
+Reading in the data. The data set is inbuilt in the MASS package. Thus, it can be read into R just like this:
+```{r}
+data("Boston")
+```
+
+I have a look at the data:
+```{r}
+str(Boston)
+dim(Boston)
+summary(Boston)
+```
+  
+The data set is now a data frame and it is comprised of 506 observations and 14 variables. All of the variables are numerical; either integer or numeric (decimal).  
+
+**The variables**  
+`crim`: per capita crime rate by town.  
+`zn`: proportion of residential land zoned for lots over 25,000 sq.ft.  
+`indus`: proportion of non-retail business acres per town.  
+`chas`: Charles River dummy variable (= 1 if tract bounds river; 0 otherwise).  
+`nox`: nitrogen oxides concentration (parts per 10 million).  
+`rm`: average number of rooms per dwelling.  
+`age`: proportion of owner-occupied units built prior to 1940.  
+`dis`: weighted mean of distances to five Boston employment centers.  
+`rad`: index of accessibility to radial highways.  
+`tax`: full-value property-tax rate per $10,000.  
+`ptratio`: pupil-teacher ratio by town.  
+`black`: the proportion of blacks by town.  
+`lstat`: lower status of the population (percent).  
+`medv`: median value of owner-occupied homes in $1000s.  
+
+
+## Distributions and relationships of the variables  
+Next, I'm creating a **graphical overview** of the data. I draw a plot matrix with `pairs()` and, then, a correlation plot with `corrplot()`.
+```{r}
+pairs(Boston)
+```
+  
+This looks at bit messy. I think I could fix it by adding arguments to `pairs()` but I'd rather try a different approach to get there histograms to better study distributions. I also try to include there Spearman correlation coefficents. 
+```{r}
+library(PerformanceAnalytics)
+chart.Correlation(Boston, histogram = TRUE, method = "spearman")
+```
+  
+I got plenty of warnings, and it is still a bit messy looking plot but I got there the histograms and the Spearman correlation coefficients. Now, it is easier to inspect the distributions and correlations. 
+The **distributions** of `crim`, `zn`, `age`, `dis`, `ptratio`, `black`, and `lstat` are very skewed. `indus`, `rad`, and `tax` have two peaks. `chas` is encoded as 0 and 1. `nox`, `rm`, and `medv` are approximately somewhat normally distributed. The Spearman correlation coefficients indicate **several positive and negative correlations** between the variables which are statistically significant.  
+I draw a correlation plot to visualize the correlations:
+```{r}
+cor_matrix <- cor(Boston) 
+corrplot(cor_matrix, method="circle")
+```
+  
+The majority of the variables are inter-correlated. Only `chas` seems to have very weak, if any, correlation to other variables.  
+
+## Standardization of the data
+
+I'm performing the scaling as in the exercise, with function `scale()`  
+```{r}
+boston_scaled <- scale(Boston)
+summary(boston_scaled)
+class(boston_scaled)
+```
+  
+The means are now at zero for all variables. The scaled data is in form of matrix array.  
+I make the scaled data to be a data frame:
+```{r}
+boston_scaled <- as.data.frame(boston_scaled)
+```
+  
+## Making a categorical variable of the crime rate  
+First, I'm checking out the quantiles:
+```{r}
+boston_scaled$crim <- as.numeric(boston_scaled$crim)
+summary(boston_scaled$crim)
+```
+Next, I'm using the quantiles in making of the categories for crime rate:  
+```{r}
+bins <- quantile(boston_scaled$crim)
+bins
+crime <- cut(boston_scaled$crim, breaks = bins, include.lowest = TRUE)
+boston_scaled <- dplyr::select(boston_scaled, -crim)
+boston_scaled <- data.frame(boston_scaled, crime)
+```
+  
+It seems to work! I have dropped out the old `crim` and got in a new `crime` variable which has crime rate gategories based on the quantiles.  
+  
+## Train and test sets
+  
+Now, I'm making the train and test sets. I pick randomly 80 % of the rows into the train set. I also save the correct classes and remove the crime variable from the test data. Here, I'm following closely the exercise 4 codes.  
+```{r}
+boston_scaled <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/boston_scaled.txt",
+                            sep=",", header = T)
+boston_scaled$crime <- factor(boston_scaled$crime, levels = c("low", "med_low", "med_high", "high"))
+nrow(boston_scaled)
+n <- 506
+ind <- sample(n,  size = n * 0.8)
+train <- boston_scaled[ind,]
+test <- boston_scaled[-ind,]
+correct_classes <- test$crime
+test <- dplyr::select(test, -crime)
+```
+  
+Now, the data is prepared for LDA.  
+
+## Linear discriminant analysis (LDA)  
+
+With the LDA, it is possible to find linear combination of the variables that separate the target variable classes, i.e. we should be able to distinguish the variables which predict certain crime rate classes in our data. This all new to me, thus, I follow the exercise 4 in my code writing.  
+```{r}
+lda.fit <- lda(crime ~ ., data = train)
+lda.fit
+lda.arrows <- function(x, myscale = 1, arrow_heads = 0.1, color = "red", tex = 0.75, choices = c(1,2)){
+  heads <- coef(x)
+  graphics::arrows(x0 = 0, y0 = 0, 
+         x1 = myscale * heads[,choices[1]], 
+         y1 = myscale * heads[,choices[2]], col=color, length = arrow_heads)
+  text(myscale * heads[,choices], labels = row.names(heads), 
+       cex = tex, col=color, pos=3)
+}
+classes <- as.numeric(train$crime)
+
+plot(lda.fit, dimen = 2)
+lda.arrows(lda.fit, myscale = 1)
+```
+  
+It seems that `rad` has a very big impact on the crime rate, i.e. the geographical location of a suburb related to circular highways might the key explanatory variable behind medium high and high crime rates of the suburb in question.  
+Now, I check how good my model was by cross-tabulations:
+```{r}
+lda.pred <- predict(lda.fit, newdata = test)
+lda.pred
+# cross tabulate the results
+table(correct = correct_classes, predicted = lda.pred$class)
+```
+  
+**Interpretation and evaluation of the LDA**  
+The model predicts very well the categories of medium high and high crime rates, whereas other categories (medium low and low crime rates) are not as accurately predicted. The model might be useful in detecting areas of high risk for high crime rate, but it shouldn't be used the other way round, to detect low crime rate suburbs.
+
+## Clustering
+  
+First, I study Euclidean and Manhattan distances. Not to mess up my previous work, I scale the data again and use `boston_scaled2` in this part.
+```{r}
+data("Boston")
+boston_scaled2 <- scale(Boston)
+dist_eu <- boston_scaled2
+dist_man <- boston_scaled2
+summary(dist_eu)
+summary(dist_man)
+```
+  
+Next, I perform a kmeans clustering with seed set at 13 and centers at 4_:
+```{r}
+set.seed(13)
+km <- kmeans(boston_scaled2, centers = 4)
+pairs(boston_scaled2, col = 4)
+```
+  
+Next, I verify whether these values were OK and visualize the result, as in the exercise 4:
+```{r}
+set.seed(123)
+# determine the number of clusters
+k_max <- 10
+
+# calculate the total within sum of squares
+twcss <- sapply(1:k_max, function(k){kmeans(boston_scaled2, k)$tot.withinss})
+
+# visualize the results
+qplot(x = 1:k_max, y = twcss, geom = 'line')
+```
+  
+It seems that it might be good to have 5 centers.
+```{r}
+# k-means clustering
+km <- kmeans(boston_scaled2, centers = 5)
+# plot the data set with clusters
+pairs(boston_scaled2, col = km$cluster)
+```
+  
+## Interpretation of clustering
+
+Based on the plot above, there are several variables which explain the clustering. For simplicity, I pick up two continuous variables, `lstat` and  `medv`, which seem to separate the clusters nicely, to closer inspection and plotting with the clusters: 
+```{r}
+plot_data <- as.data.frame(boston_scaled2)
+plot_data$cluster <- factor(km$cluster)
+ggplot(plot_data, aes(x = lstat, y = medv)) +
+  geom_point(aes(color = cluster)) +
+  labs(color = 'Cluster')
+```
+  
+To remind, what the variables stand for:  
+`lstat`: lower status of the population (percent).  
+`medv`: median value of owner-occupied homes in $1000s.  
+
+The clusters are not very clearly separated with these two variables, but there are some features of each clusters that can be observed.  
+**Cluster 1** is "the average neighborhood", characterized by roughly mean values in both variables: the value of owner-occupied homes and percentage of lower status population. **Cluster 2** differs from cluster 1 by having higher value (or just more) of owner-occupied homes and lower percentage of lower status population. **Cluster 3** is overlapping with other clusters, but its emphasis is in the higher percentage of lower status population and lower value of owner-occupied homes. **Cluster 4** is overlapping with cluster 3, but it has even more pronounced pattern of high representation of lower status population and lower value owner-occupied homes. **Cluster 5** is best described as _Kauniainen_, i.e. it has generally high value of owner-occupied homes and low percentage of lower status recidents, but there are still few present (most likely living close to the railway station). ;) 
+  
+The variables seem to have correlation, which interfers the results. E.g. `lstat` and `medv` seem to have negative correlation, meaning the higher the value of owner-occupied homes, the lower the percentage of the lower status population is in the area.  
+
+The cluster separation could be more distinct. Now, they overlap quite a lot to my taste. Probably I misinterpreted the elbow plot and the real cluster number should have been less than 5. Also, the data should be cleaned for outliers: I suspect that the spots at max value of `medv` are actually outliers.  
+
+## Bonus
+
+I give this a shot in dark, doing copy-paste with the previous code chunks:
+```{r}
+boston_scaled3 <- scale(Boston)
+kmeans_bonus <- kmeans(boston_scaled3, centers = 5)
+Boston$cluster <- factor(kmeans_bonus$cluster)
+lda_fit_bonus <- lda(cluster ~ ., data = Boston)
+```
+  
+Now, testing visualization:
+```{r}
+plot(lda_fit_bonus)
+```
+  
+And then, checking out the coefficients:  
+```{r}
+lda_fit_bonus$scaling
+```
+  
+It seems that `crim`, `chas`, and `nox` have the highest impacts in clustering.
+  
+## Super-Bonus
+  
+```{r}
+model_predictors <- Boston[, -which(names(Boston) == "cluster")]
+dim(model_predictors)
+dim(lda.fit$scaling)
+```
+  
+Here, I'm taking the advange of the Bonus exercise:  
+```{r}
+matrix_product <- as.matrix(model_predictors) %*% lda_fit_bonus$scaling
+matrix_product <- as.data.frame(matrix_product)
+```
+  
+Getting plotly:
+```{r}
+#install.packages("plotly")
+library(plotly)
+```
+  
+Drawing a 3D plot with the crime categories as coloring:
+```{r}
+plot_ly(x = matrix_product$LD1, y = matrix_product$LD2, z = matrix_product$LD3, type= 'scatter3d', mode='markers', color = boston_scaled$crime) 
+```
+  
+Also here, it is clear that the class "high" is standing far out from the other classes.
+
+```{r}
+plot_ly(x = matrix_product$LD1, y = matrix_product$LD2, z = matrix_product$LD3, type= 'scatter3d', mode='markers', color = km$cluster) 
+```
+  
+It seems that the clusters for crime rate and the clusters based on kmeans represent just the same socioeconomic clusters in the real life!
