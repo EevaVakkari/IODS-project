@@ -1,0 +1,134 @@
+# Assignment 5
+
+**Eeva Vakkari**
+
+<https://github.com/EevaVakkari/IODS-project>
+
+## Introduction
+Two UNDP Human development report data sets "Human development" and "Gender inequality" were joined in week 4 data wrangling exercise and further modified in week 5 exercise to study the phenomena in different countries. The joined data depicts human development and gender inequality, as well as their components, in different countries, allowing studies in their correlations.  
+  
+With these exercises, I aim to learn principal component analysis (PCA) which is one of the most utilized dimension reduction techniques. I also do a short introductory exercise with multiple correspondence analysis (MCA) with another data set.
+
+Here, I'm using the data frame `human` which was created in the data wrangling exercises of weeks 4 and 5. Please, see my script <tähän linkki> for details.
+
+For original data reference, see <https://hdr.undp.org/data-center/human-development-index#/indicies/HDI>
+
+**The variables**
+The variable names were shortened in the previous exercises as follows:
+`Country` : Country name  
+`Life.Exp` : Life Expectancy at Birth  
+`Edu.Exp` : Expected Years of Education  
+`GNI` : Gross National Income (GNI) per Capita  
+`Mat.Mort` : Maternal Mortality Ratio, 
+`Ado.Birth` : Adolescent Birth Rate  
+`Parli.F` : Percentage of female representatives in parliament  
+Also, two additional variables were computed based on other variables as follows:
+`Edu2.FM` : Population with Secondary Education (Female)/Population with Secondary Education (Male)  
+`Labo.FM` : Labour Force Participation Rate (Female)/Labour Force Participation Rate (Male)
+
+
+```{r}
+date()
+```
+Let's suppress warnings to make the report more clear:
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+Loading required packages:
+```{r}
+library(MASS)
+library(corrplot)
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readr)
+library(FactoMineR)
+library(tibble)
+library(GGally)
+library(PerformanceAnalytics)
+```
+  
+## Overview of the data  
+
+Moving `Countries` into row names:
+```{r}
+human <- read.table("~/Polyembryony_R/IODS/IODS-project/human.txt", sep = ",", header = T)
+human_ <- column_to_rownames(human, "Country")
+dim(human_)
+head(human_)
+```
+  
+Looks good. Now, making graphical and numerical summaries of the data
+First, the numerical summaries of the variables and their correlations:
+```{r}
+summary(human_)
+cor(human_)
+```
+  
+Then, the plots:  
+```{r}
+plot(human_) #scatter plots
+chart.Correlation(human_, histogram = TRUE, method = "spearman") #distributions and Spearman correlations
+cor_matrix <- cor(human_) #more simplified correlation plot
+corrplot(cor_matrix, method="circle")
+```
+  
+There seems to be very strong, both positive and negative, correlations between the variables. `Parli.F` and `Labo.FM`are the only variables to exhibit clearly weak correlations only. The distributions are mainly very skewed, only `Edu.Exp` has somewhat normal(ish) distribution. 
+  
+## PCA with non-standardized data  
+
+Next, I'm doing a principal component analysis with unstandardized data and drawing biplots:
+```{r}
+pca_human <- prcomp(human_) 
+#a biplot of the principal component representation and the original variables
+biplot(pca_human, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+summary(pca_human)
+```
+  
+With unstandardized data, it seems that the standard deviations of the PCs are so huge that the PCA is useless.
+
+## PCA with standardized data
+
+First, standardization of the data and then the same PCA and plot as above:
+```{r}
+human_std <- scale(human_)
+pca_human_std <- prcomp(human_std)
+biplot(pca_human_std, choices = 1:2, cex = c(0.8, 1), col = c("grey40", "deeppink2"))
+summary(pca_human_std)
+```
+
+Now, after standardization, it seems that the PCA gives reasonable results.  
+
+## Interpretation of the PCAs
+
+It seems that `Mat.Mort` (Maternal Mortality Ratio) and `Ado.Birth` (Adolescent Birth Rate) group together and `Life.Exp` (Life Expectancy at Birth), `Edu2.FM` (Population with Secondary Education (Female)/Population with Secondary Education (Male)) and `Edu.Exp` (Expected Years of Education) form another, counteracting group of variables. These two groups of variables seem to form the main axis, the PC1, which explains 53,6 % of the variance. The PC2, which is the second most explaining axis for the data with 16,2 %, depicts `Parli.F` (Percentage of female representatives in parliament) and `Labo.FM` (Labour Force Participation Rate (Female)/Labour Force Participation Rate (Male)). Thus, it seems that higher human development and better situation in gender inequality for a country are reflected in higher education rate, and in higher female education rate in particular, combined with longer life expectancy and lower maternal mortality and adolescent birth rate. Also, higher proportion of females in labour force and parliament promote better human development in a country, but they are not as significant as the attributes of the PC1.   
+
+## MCA of tea drinking habits 
+  
+Loading the data and converting the characters to factors by using `stringsAsFactors()` function:  
+```{r}
+tea <- read.csv("https://raw.githubusercontent.com/KimmoVehkalahti/Helsinki-Open-Data-Science/master/datasets/tea.csv", stringsAsFactors = TRUE)
+str(tea)
+dim(tea)
+View(tea)
+```
+  
+It's a massive data set with 36 variables. For speeding up the plotting and for better clarity of my report, I'll pick just few of them into the analysis. Now, a little visualization of the data with reduced amount of variables:
+```{r}
+keep_columns <- c("Tea", "How", "how", "sugar", "where", "lunch")
+tea_time <- select(tea, keep_columns)
+pivot_longer(tea_time, cols = everything()) %>% 
+  ggplot(aes(value)) + facet_wrap("name", scales = "free")+
+  geom_bar()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 8))
+```
+  
+Then, I'll perform the Multiple Correspondence Analysis (MCA  )
+```{r}
+mca <- MCA(tea_time, graph = FALSE)
+summary(mca)
+plot(mca, invisible=c("ind"), graph.type = "classic", habillage = "quali")
+```
+  
+Basically,  the MCA output is the same as PCA's but done with categorical (character) variables. Some of the variables clearly group together, e.g. a person buying unpackaged tea seems to do the shopping in a tea shop (not very surprisingly).    
