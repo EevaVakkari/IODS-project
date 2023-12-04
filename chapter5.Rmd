@@ -9,7 +9,7 @@ Two UNDP Human development report data sets "Human development" and "Gender ineq
   
 With these exercises, I aim to learn principal component analysis (PCA) which is one of the most utilized dimension reduction techniques. I also do a short introductory exercise with multiple correspondence analysis (MCA) with another data set.
 
-Here, I'm using the data frame `human` which was created in the data wrangling exercises of weeks 4 and 5. Please, see my script <tähän linkki> for details.
+Here, I'm using the data frame `human` which was created in the data wrangling exercises of weeks 4 and 5. Please, see my script <https://github.com/EevaVakkari/IODS-project/blob/master/create_human_w5.R> for details.
 
 For original data reference, see <https://hdr.undp.org/data-center/human-development-index#/indicies/HDI>
 
