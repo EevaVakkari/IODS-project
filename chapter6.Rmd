@@ -1,0 +1,151 @@
+# Assignment 6
+
+**Eeva Vakkari**
+
+<https://github.com/EevaVakkari/IODS-project>
+
+## Introduction
+This week, I'm working with two time series data sets, `RATS` and `BPRS`. The first data set `RATS` originates from an experiment with rats put on varying diets and their body mass recorded over a study period of nine weeks. The second data set `BPRS`(Brief Psychiatric Rating Scale) is composed of repetitive BPRS scores of patients taking different treatments for their disorders over a period of time.  
+
+The data was originally in wide form, as usual with longitudinal data. During the data wrangling part, both data sets were converted into long form. Here, I'll study the summary measures of both data sets and, also, explore them briefly with linear mixed effects models.
+
+Please, see my script <https://github.com/EevaVakkari/IODS-project/blob/master/meet_and_repeat.R> for details of the form conversion.
+
+For original data, see MABS repository <https://github.com/KimmoVehkalahti/MABS>
+
+**The variables**
+`RATSL` is the rat data set in long form. Its variables are `ID` (individual rat), `Group`(diet), `Time`(weighing time point) and `Weight`(body weight in grams).  
+`BPRSL` is the psychiatric treatment effectiveness data set in long form. Its variables are `treatment`(the treatment a patient is taking), `subject`(a patient), `week`(week number from the start of the treatment), and `bprs`(the BPRS score of a patient).
+
+
+```{r}
+date()
+```
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
+
+Loading required packages:
+```{r}
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readr)
+library(lme4)
+library(ggplot2)
+```
+  
+## Longitudinal data exploration with rats 
+
+Reading the rat data in R, converting the categorical variables into factors, transforming the data in long form, renaming the measurements as "weight", extracting time points as integer numbers and checking out the results. I use Kimmo's table, just in case if I have messed up with my data wrangling.
+```{r}
+RATS <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/MABS/master/Examples/data/rats.txt", header = TRUE, sep = '\t')
+RATS$ID <- factor(RATS$ID)
+RATS$Group <- factor(RATS$Group)
+RATSL <- pivot_longer(RATS, cols=-c(ID,Group), names_to = "WD",values_to = "Weight")  %>%  mutate(Time = as.integer(substr(WD,3,4))) %>% arrange(Time)
+dim(RATSL)
+head(RATSL)
+str(RATSL)
+```
+  
+Looks good, I have to ID and Group as categorical variables, and weight and time as integers. Now, in log form, there are 176 observations and 5 variables.
+  
+
+Next, some graphical and numerical summaries of the data. 
+```{r}
+ggplot(RATSL, aes(x = Time, y = Weight, group = ID, linetype = Group, color = Group)) +
+  geom_line() +
+  labs(title = "Weight changes of rats", x = "Time", y = "Body Weight (g)")
+ratsl_summary <- RATSL %>%
+  group_by(Group, Time) %>%
+  summarise( mean=mean(Weight) ) %>%
+  ungroup()
+ratsl_summary
+```
+
+  
+**Interpretation of non-standardized RATS data**  
+It seems that there are differences between the diets. Rats on diet 1 are not only having less overall body mass, but they also hardly gain any weight during the study. Rats on diets 2 and 3 seem to gain more body mass during the study. Within group 2, there's one potential outlier: an individual much heavier than the others, but, on the other hand, it gains weight at the same pace as the others in its group. It looks like the group 2 is gaining more weight despite having lower weight at the start than the group 3. Based on these preliminary explorations of the data, it seems like the diet 2 might be resulting in the highest body mass gain.
+
+Next, I'll standardize the data and plot it again and make the summary again
+```{r}
+RATSL <- RATSL %>%
+  group_by(Time) %>%
+  mutate(stdrats = (Weight - mean(Weight))/sd(Weight) ) %>%
+  ungroup()
+ggplot(RATSL, aes(x = Time, y = stdrats, group = ID, linetype = Group, color = Group)) +
+  geom_line() +
+  labs(title = "Weight changes of rats", x = "Time", y = "Standardized body weight change")
+ratsl_summary2 <- RATSL %>%
+  group_by(Group, Time) %>%
+  summarise( mean=mean(Weight) ) %>%
+  ungroup()
+#ratsl_summary2S <- ratsl_summary2 %>%  #I just never got this part of my code working, I ran out of time.
+  #filter(mean < 60)
+#t.test(mean ~ Group, data = ratsl_summary2, var.equal = TRUE)
+ratsl_summary2
+```
+  
+I'll plot the summary statistics with a boxplot
+```{r}
+ggplot(ratsl_summary, aes(x = Group, y = mean, fill = Group)) +
+  geom_boxplot() +
+  stat_summary(fun = "mean", geom = "point", shape=23, size=4, fill = "white") +
+  scale_y_continuous(name = "mean(Weight)")+
+  labs(title = "Mean body weight in each group of rats")
+```
+  
+```{r}
+ratsl_summary2S <- ratsl_summary2 %>%
+  filter(mean < 60)
+```
+
+
+**Interpretation of the standardized RATS data**
+Now, after standardization, the situation looks completely different. It seems that the rats on diet 3 are fat at start and they are maybe slightly loosing weight during the diet. The rats on diet 2 are not so fat at the beginning, on average, but they are gaining some weight during their diet. And, finally, the rats on diet 1 are thin at the beginning and they stay thin throughout the diet, and they are thin at the end.
+
+The summary statistics indicate the same as interpreted from the standardized values' plot above: that the group 1 rats are thin, whereas groups 2 and 3 are fatter. The boxplot also illustrates that the individuals in the groups are very uniform - there are no clear outliers.
+  
+## Linear Mixed Effects Models with BPRS data  
+
+Reading the BPRS data in R, converting the categorical variables into factors, transforming the data in long form, renaming the measurements as "weight", extracting time points as integer numbers and checking out the results. Again, I use Kimmo's table, just in case if I have messed up with my data wrangling.
+```{r}
+BPRS <- read.table("https://raw.githubusercontent.com/KimmoVehkalahti/MABS/master/Examples/data/BPRS.txt", sep  =" ", header = T)
+BPRS$treatment <- factor(BPRS$treatment)
+BPRS$subject <- factor(BPRS$subject)
+BPRSL <-  pivot_longer(BPRS, cols=-c(treatment,subject),names_to = "weeks",values_to = "bprs") %>% arrange(weeks)
+BPRSL <-  BPRSL %>% mutate(week = as.integer(substr(weeks,5,5)))
+glimpse(BPRSL)
+```
+  
+Look's good: 360 observations, 5 variables of which two are factors, one character, and two integers.
+
+Plotting:
+```{r}
+ggplot(BPRSL, aes(x = week, y = bprs, group = subject, color = treatment)) +
+  geom_line() +
+  theme_bw() +
+  labs(title = "Response to treatment", x = "Time in weeks", y = "BPRS Score")
+```
+  
+Looks very messy, indeed. There might be a decreasing trend in BPRS scores, which would indicate that the symptoms are easing up during the treatment. Let's study this with models.
+
+First, a regression model with `bprs` as the response variable and `week` and `treatment` as explanatory variables
+```{r}
+BPRSL_reg <- lm(bprs ~ week + treatment, data = BPRSL)
+summary(BPRSL_reg)
+```
+  
+It seems that there is a statistically significant effect on BPRS scores over time. 
+
+Next, fitting a mixed effects model using a random intercept and slope model that allows for a group × time interaction
+```{r}
+BPRSL_lme <- lmer(bprs ~ week + treatment + (1 | subject), data = BPRSL, REML = FALSE) #random intercept model
+BPRSL_lme1 <- lmer(bprs ~ week + treatment + (week | subject), data = BPRSL, REML = FALSE) #random intercept and random slope model
+summary(BPRSL_lme)
+summary(BPRSL_lme1)
+anova(BPRSL_lme, BPRSL_lme1)
+```
+  
+**Interpretation**
+It seems that there is statistically significant decrease in BPRS scores of the patients during the weeks of treatments. However, it seems that there is no difference between the two treatments. So, the most important thing for a patient is to have some sort of treatment and not be left without any.
