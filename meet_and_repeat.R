@@ -62,4 +62,4 @@ str(RATSL)
 write.csv(BPRSL, "BPRSL.csv", row.names = F, col.names = F)
 write.csv(RATSL, "RATSL.csv", row.names = F, col.names = F)
 
-#Data wrangling completed, contuing into the analysis exercise of week 6.
+#Data wrangling completed, continuing into the analysis exercise of week 6.
